@@ -1,0 +1,73 @@
+CREATE VIEW v_WriteAccessPrincipals AS
+SELECT DISTINCT dp.name
+FROM sys.database_permissions perm
+JOIN sys.database_principals dp 
+    ON perm.grantee_principal_id = dp.principal_id
+WHERE perm.permission_name IN ('UPDATE','INSERT','DELETE');
+
+
+
++++++++++++++++++Run this to isolate ONLY groups with WRITE access:
+
+SELECT 
+    dp.name AS principal_name,
+    perm.permission_name
+FROM sys.database_permissions perm
+JOIN sys.database_principals dp 
+    ON perm.grantee_principal_id = dp.principal_id
+WHERE perm.permission_name IN ('UPDATE','INSERT','DELETE')
+ORDER BY dp.name;
+
+
+++++++++++++++Step 4 — Check role membership (VERY IMPORTANT)
+
+Many times, the group is added to a role:
+SELECT 
+    r.name AS role_name,
+    m.name AS member_name
+FROM sys.database_role_members drm
+JOIN sys.database_principals r 
+    ON drm.role_principal_id = r.principal_id
+JOIN sys.database_principals m 
+    ON drm.member_principal_id = m.principal_id
+ORDER BY r.name;
+
+
+-*********Step 3 — Check database-level access for those groups
+SELECT 
+    dp.name AS principal_name,
+    dp.type_desc,
+    perm.permission_name,
+    perm.state_desc
+FROM sys.database_permissions perm
+JOIN sys.database_principals dp 
+    ON perm.grantee_principal_id = dp.principal_id
+WHERE dp.type_desc IN ('WINDOWS_GROUP', 'DATABASE_ROLE')
+ORDER BY dp.name;
+
+++++++++++++++++Fin group exist in sql
+SELECT name, type_desc
+FROM sys.server_principals
+WHERE type IN ('G') -- Windows groups
+ORDER BY name;
+
+
+
+
++++++++++++++++++++++++Starting point
+EXEC xp_logininfo 'DOMAIN\username', 'all';
+
+
+
+
++++++++++++++++++++++++++
+
+SELECT * 
+FROM sys.server_permissions
+WHERE state_desc = 'DENY';
+
++++++++++++++++++
+
+SELECT name, type_desc
+FROM sys.server_principals
+WHERE name LIKE '%YourGroupName%';
