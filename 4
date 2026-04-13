@@ -1,0 +1,17 @@
+SELECT 
+    sp.name,
+    sp.type_desc,
+    perm.permission_name,
+    perm.state_desc
+FROM sys.server_permissions perm
+JOIN sys.server_principals sp
+    ON perm.grantee_principal_id = sp.principal_id
+WHERE perm.permission_name = 'CONNECT SQL'
+ORDER BY sp.name, perm.state_desc;
+
+
+
+
+++++++++++++++++++++++++++
+
+EXEC xp_readerrorlog 0, 1, 'Login failed';
