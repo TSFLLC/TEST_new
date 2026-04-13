@@ -1,0 +1,8 @@
+SELECT 
+    sp.name,
+    perm.permission_name,
+    perm.state_desc
+FROM sys.server_principals sp
+LEFT JOIN sys.server_permissions perm
+    ON sp.principal_id = perm.grantee_principal_id
+WHERE sp.name = 'ARDENTHEALTH\Sec_SQL_Tera-EDM_RW';
