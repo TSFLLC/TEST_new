@@ -1,0 +1,118 @@
+1. Check who has broad access
+
+SELECT 
+    dp1.name AS DatabaseRole,
+    dp2.name AS MemberName
+FROM sys.database_role_members drm
+JOIN sys.database_principals dp1 
+    ON drm.role_principal_id = dp1.principal_id
+JOIN sys.database_principals dp2 
+    ON drm.member_principal_id = dp2.principal_id
+WHERE dp1.name IN ('db_datareader', 'db_datawriter')
+ORDER BY dp1.name, dp2.name;
+
+
+
+++++++++++++++2.deny broad access to those 4 tables and create a separate restricted role just for approved users + one service account++++++++++++++
+0-- 1. Create restricted role
+CREATE ROLE TERA_Restricted4Tables_RW;
+GO
+
+-- 2. Add only approved AD group/user and service account
+ALTER ROLE TERA_Restricted4Tables_RW 
+ADD MEMBER [DOMAIN\Approved_AD_Group];
+
+ALTER ROLE TERA_Restricted4Tables_RW 
+ADD MEMBER [DOMAIN\ServiceAccountName];
+GO
+
+-- 3. Grant access only to the 4 tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::SchemaName.Table1 TO TERA_Restricted4Tables_RW;
+GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::SchemaName.Table2 TO TERA_Restricted4Tables_RW;
+GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::SchemaName.Table3 TO TERA_Restricted4Tables_RW;
+GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::SchemaName.Table4 TO TERA_Restricted4Tables_RW;
+GO
+
+
+
+++++++++++++++///
+Then block everyone else who currently gets broad read access:+++++++++++++++++///
+
+DENY SELECT ON OBJECT::SchemaName.Table1 TO db_datareader;
+DENY SELECT ON OBJECT::SchemaName.Table2 TO db_datareader;
+DENY SELECT ON OBJECT::SchemaName.Table3 TO db_datareader;
+DENY SELECT ON OBJECT::SchemaName.Table4 TO db_datareader;
+GO
+
+
+++++++++++++++++++//If there are custom read-only roles, deny those too://+++++++++++++++
+DENY SELECT ON OBJECT::SchemaName.Table1 TO TERA_ReadOnly_Role;
+DENY SELECT ON OBJECT::SchemaName.Table2 TO TERA_ReadOnly_Role;
+DENY SELECT ON OBJECT::SchemaName.Table3 TO TERA_ReadOnly_Role;
+DENY SELECT ON OBJECT::SchemaName.Table4 TO TERA_ReadOnly_Role;
+GO
+
+
+
+
+4--You can identify custom read-only roles by checking:
+SELECT 
+    dp.name AS RoleName,
+    dp.type_desc
+FROM sys.database_principals dp
+WHERE dp.type = 'R'
+AND dp.name NOT IN (
+    'db_owner',
+    'db_accessadmin',
+    'db_securityadmin',
+    'db_ddladmin',
+    'db_backupoperator',
+    'db_datareader',
+    'db_datawriter',
+    'db_denydatareader',
+    'db_denydatawriter'
+)
+ORDER BY dp.name;
+
+5.  Then check what permissions they have:
+SELECT 
+    pr.name AS RoleName,
+    pe.permission_name,
+    pe.state_desc,
+    OBJECT_NAME(pe.major_id) AS ObjectName,
+    SCHEMA_NAME(o.schema_id) AS SchemaName
+FROM sys.database_permissions pe
+JOIN sys.database_principals pr
+    ON pe.grantee_principal_id = pr.principal_id
+LEFT JOIN sys.objects o
+    ON pe.major_id = o.object_id
+WHERE pr.type = 'R'
+ORDER BY pr.name;
+
+6. Then check who belongs to those roles:
+SELECT 
+    r.name AS RoleName,
+    m.name AS MemberName,
+    m.type_desc AS MemberType
+FROM sys.database_role_members drm
+JOIN sys.database_principals r
+    ON drm.role_principal_id = r.principal_id
+JOIN sys.database_principals m
+    ON drm.member_principal_id = m.principal_id
+ORDER BY r.name, m.name;
+
+
+
+
++++++++++++++++++9999Another powerful query to specifically find roles with SELECT access:
+SELECT DISTINCT
+    dp.name AS RoleName
+FROM sys.database_permissions pe
+JOIN sys.database_principals dp
+    ON pe.grantee_principal_id = dp.principal_id
+WHERE dp.type = 'R'
+AND pe.permission_name = 'SELECT'
+ORDER BY dp.name;
+
++++++++Those are the roles you may need to explicitly:
+DENY SELECT ON OBJECT::schema.table TO RoleName;
