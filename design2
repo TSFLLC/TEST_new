@@ -3,3 +3,61 @@
 3. Deny SELECT on those 2 tables to db_datareader and other broad read roles.
 4. Make sure the service account is not inside the denied broad group.
 5. Remove developers from sysadmin if they should not access the tables.
+
+
+
+1. Confirm service account is in your restricted role
+USE [M4];
+GO
+
+ALTER ROLE [Your_Restricted_Role_Name]
+ADD MEMBER [DOMAIN\ServiceAccountName];
+GO
+2. Grant the service account role access to the 2 tables
+GRANT SELECT, INSERT, UPDATE, DELETE 
+ON OBJECT::[SchemaName].[Table1]
+TO [Your_Restricted_Role_Name];
+GO
+
+GRANT SELECT, INSERT, UPDATE, DELETE 
+ON OBJECT::[SchemaName].[Table2]
+TO [Your_Restricted_Role_Name];
+GO
+
+If the service account only needs read access, use this instead:
+
+GRANT SELECT 
+ON OBJECT::[SchemaName].[Table1]
+TO [Your_Restricted_Role_Name];
+GO
+
+GRANT SELECT 
+ON OBJECT::[SchemaName].[Table2]
+TO [Your_Restricted_Role_Name];
+GO
+3. Deny broad readers from those 2 tables
+DENY SELECT ON OBJECT::[SchemaName].[Table1] TO [db_datareader];
+GO
+
+DENY SELECT ON OBJECT::[SchemaName].[Table2] TO [db_datareader];
+GO
+
+If you have custom read-only roles, deny them too:
+
+DENY SELECT ON OBJECT::[SchemaName].[Table1] TO [Custom_ReadOnly_Role];
+GO
+
+DENY SELECT ON OBJECT::[SchemaName].[Table2] TO [Custom_ReadOnly_Role];
+GO
+4. Validate permissions
+SELECT 
+    USER_NAME(p.grantee_principal_id) AS PrincipalName,
+    p.state_desc,
+    p.permission_name,
+    SCHEMA_NAME(o.schema_id) AS SchemaName,
+    o.name AS ObjectName
+FROM sys.database_permissions p
+JOIN sys.objects o
+    ON p.major_id = o.object_id
+WHERE o.name IN ('Table1', 'Table2')
+ORDER BY ObjectName, PrincipalName;
