@@ -1,0 +1,5 @@
+1. Create a dedicated role for the service account.
+2. Grant that role access to only those 2 tables.
+3. Deny SELECT on those 2 tables to db_datareader and other broad read roles.
+4. Make sure the service account is not inside the denied broad group.
+5. Remove developers from sysadmin if they should not access the tables.
